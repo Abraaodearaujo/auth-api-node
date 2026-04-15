@@ -4,7 +4,7 @@ const ApiError = require('../errors/ApiError');
 async function getProfile(req, res, next) {
   try {
     const db = await getDb();
-    const stmt = db.prepare('SELECT id, name, email, created_at FROM users WHERE id = ?');
+    const stmt = db.prepare('SELECT id, name, email, role, created_at FROM users WHERE id = ?');
     stmt.bind([req.user.id]);
 
     if (!stmt.step()) {
@@ -24,7 +24,7 @@ async function getProfile(req, res, next) {
 async function listUsers(req, res, next) {
   try {
     const db = await getDb();
-    const stmt = db.prepare('SELECT id, name, email, created_at FROM users ORDER BY id DESC');
+    const stmt = db.prepare('SELECT id, name, email, role, created_at FROM users ORDER BY id DESC');
 
     const users = [];
     while (stmt.step()) {

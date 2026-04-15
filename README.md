@@ -5,6 +5,10 @@ A simple Node.js authentication API using JWT, SQLite (`sql.js`), bcrypt passwor
 ## Features
 
 - User registration and login with JWT authentication
+- Refresh token rotation for long-lived sessions
+- Role-based access control with `admin` and `user` roles
+- Password reset workflow with one-time reset tokens
+- Swagger UI documentation at `/api/docs`
 - Protected routes using a reusable auth middleware
 - Centralized error handling with structured HTTP responses
 - Global rate limiting and auth route rate limiting
@@ -68,6 +72,9 @@ Supported variables:
 - `PORT` — server port (default: `3000`)
 - `JWT_SECRET` — JWT secret key (default: `troque-este-segredo-em-producao`)
 - `JWT_EXPIRES_IN` — JWT expiration time (default: `1h`)
+- `REFRESH_TOKEN_SECRET` — secret used for refresh token generation (default: same as `JWT_SECRET`)
+- `REFRESH_TOKEN_EXPIRES_DAYS` — refresh token lifetime in days (default: `7`)
+- `PASSWORD_RESET_TOKEN_EXPIRES_MINUTES` — reset token lifetime in minutes (default: `60`)
 - `RATE_LIMIT_WINDOW_MS` — rate limit window in milliseconds (default: `900000`)
 - `RATE_LIMIT_MAX` — global request limit per window (default: `100`)
 - `AUTH_RATE_LIMIT_MAX` — auth route request limit per window (default: `20`)
@@ -147,7 +154,68 @@ Returns the current authenticated user profile.
 
 #### `GET /api/users`
 
-Returns all registered users.
+Returns all registered users. This route is restricted to users with the `admin` role.
+
+### Refresh tokens
+
+#### `POST /api/auth/refresh`
+
+Exchanges a refresh token for a new access token and refresh token.
+
+Request body:
+
+```json
+{
+  "refreshToken": "<refresh-token>"
+}
+```
+
+### Logout
+
+#### `POST /api/auth/logout`
+
+Invalidates a refresh token.
+
+Request body:
+
+```json
+{
+  "refreshToken": "<refresh-token>"
+}
+```
+
+### Password reset
+
+#### `POST /api/auth/forgot-password`
+
+Generates a password reset token for the user email.
+
+Request body:
+
+```json
+{
+  "email": "maria@example.com"
+}
+```
+
+#### `POST /api/auth/reset-password`
+
+Resets the password using a valid reset token.
+
+Request body:
+
+```json
+{
+  "token": "<reset-token>",
+  "password": "newPassword123"
+}
+```
+
+### Swagger documentation
+
+- `GET /api/docs`
+
+Open the interactive Swagger UI to explore endpoints.
 
 ## Example with cURL
 
