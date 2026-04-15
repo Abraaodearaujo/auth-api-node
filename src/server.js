@@ -1,13 +1,24 @@
 const app = require('./app');
+const logger = require('./utils/logger');
 const { PORT } = require('./config/env');
 
 app.listen(PORT, () => {
-  console.log(`\n🚀 Servidor rodando em http://localhost:${PORT}`);
-  console.log(`   Ambiente : ${process.env.NODE_ENV || 'development'}`);
-  console.log(`\n📋 Rotas disponíveis:`);
-  console.log(`   GET  /health`);
-  console.log(`   POST /api/auth/register`);
-  console.log(`   POST /api/auth/login`);
-  console.log(`   GET  /api/users/me   [🔒 JWT]`);
-  console.log(`   GET  /api/users      [🔒 JWT]\n`);
+  logger.info(`Server running on http://localhost:${PORT}`);
+  logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  logger.info('Available routes:');
+  logger.info('GET  /health');
+  logger.info('POST /api/auth/register');
+  logger.info('POST /api/auth/login');
+  logger.info('GET  /api/users/me   [🔒 JWT]');
+  logger.info('GET  /api/users      [🔒 JWT]');
+});
+
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled Rejection', { reason });
+  process.exit(1);
+});
+
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught Exception', { error });
+  process.exit(1);
 });

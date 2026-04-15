@@ -1,16 +1,17 @@
 const jwt = require('jsonwebtoken');
 const { JWT_SECRET } = require('../config/env');
+const ApiError = require('../errors/ApiError');
 
-function authMiddleware(req, res, next) {
-  const authHeader = req.headers['authorization'];
+function authMiddleware(req, _res, next) {
+  const authHeader = req.headers.authorization;
 
   if (!authHeader) {
-    return res.status(401).json({ error: 'Token não fornecido.' });
+    return next(ApiError.unauthorized('Authorization header not provided.'));
   }
 
   const parts = authHeader.split(' ');
   if (parts.length !== 2 || parts[0] !== 'Bearer') {
-    return res.status(401).json({ error: 'Formato de token inválido. Use: Bearer <token>' });
+    return next(ApiError.unauthorized('Invalid authorization header format. Use: Bearer <token>')); 
   }
 
   const token = parts[1];
@@ -21,9 +22,9 @@ function authMiddleware(req, res, next) {
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
-      return res.status(401).json({ error: 'Token expirado.' });
+      return next(ApiError.unauthorized('Token expired.'));
     }
-    return res.status(401).json({ error: 'Token inválido.' });
+    return next(ApiError.unauthorized('Invalid token.'));
   }
 }
 

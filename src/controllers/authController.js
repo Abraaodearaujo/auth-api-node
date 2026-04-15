@@ -1,61 +1,68 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const db = require('../config/database');
+const { getDb, save } = require('../config/database');
 const { JWT_SECRET, JWT_EXPIRES_IN } = require('../config/env');
+const ApiError = require('../errors/ApiError');
 
 const SALT_ROUNDS = 12;
 
-const register = (req, res) => {
+async function register(req, res, next) {
   const { name, email, password } = req.body;
 
   try {
-    const existing = db
-      .prepare('SELECT id FROM users WHERE email = ?')
-      .get(email);
+    const db = await getDb();
+    const existingStmt = db.prepare('SELECT id FROM users WHERE email = ?');
+    existingStmt.bind([email]);
+    const existing = existingStmt.step() ? existingStmt.getAsObject() : null;
+    existingStmt.free();
 
     if (existing) {
-      return res.status(409).json({ message: 'E-mail já cadastrado.' });
+      return next(ApiError.conflict('Email is already registered.'));
     }
 
     const passwordHash = bcrypt.hashSync(password, SALT_ROUNDS);
+    const insertStmt = db.prepare('INSERT INTO users (name, email, password) VALUES (?, ?, ?)');
+    insertStmt.run([name, email, passwordHash]);
+    insertStmt.free();
+    save();
 
-    const result = db
-      .prepare('INSERT INTO users (name, email, password) VALUES (?, ?, ?)')
-      .run(name, email, passwordHash);
-
-    const userId = result.lastInsertRowid;
-
+    const userIdStmt = db.prepare('SELECT id FROM users WHERE email = ?');
+    userIdStmt.bind([email]);
+    userIdStmt.step();
+    const userId = userIdStmt.getAsObject().id;
+    userIdStmt.free();
     const token = jwt.sign({ id: userId, email }, JWT_SECRET, {
       expiresIn: JWT_EXPIRES_IN,
     });
 
     return res.status(201).json({
-      message: 'Usuário criado com sucesso.',
+      message: 'User created successfully.',
       user: { id: userId, name, email },
       token,
     });
   } catch (err) {
-    console.error('[register]', err);
-    return res.status(500).json({ message: 'Erro interno do servidor.' });
+    return next(ApiError.internal('Failed to register user.'));
   }
-};
+}
 
-const login = (req, res) => {
+async function login(req, res, next) {
   const { email, password } = req.body;
 
   try {
-    const user = db
-      .prepare('SELECT * FROM users WHERE email = ?')
-      .get(email);
+    const db = await getDb();
+    const userStmt = db.prepare('SELECT * FROM users WHERE email = ?');
+    userStmt.bind([email]);
+    const user = userStmt.step() ? userStmt.getAsObject() : null;
+    userStmt.free();
 
     if (!user) {
-      return res.status(401).json({ message: 'Credenciais inválidas.' });
+      return next(ApiError.unauthorized('Invalid credentials.'));
     }
 
     const passwordMatch = bcrypt.compareSync(password, user.password);
 
     if (!passwordMatch) {
-      return res.status(401).json({ message: 'Credenciais inválidas.' });
+      return next(ApiError.unauthorized('Invalid credentials.'));
     }
 
     const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, {
@@ -63,14 +70,13 @@ const login = (req, res) => {
     });
 
     return res.status(200).json({
-      message: 'Login realizado com sucesso.',
+      message: 'Login successful.',
       user: { id: user.id, name: user.name, email: user.email },
       token,
     });
   } catch (err) {
-    console.error('[login]', err);
-    return res.status(500).json({ message: 'Erro interno do servidor.' });
+    return next(ApiError.internal('Failed to authenticate user.'));
   }
-};
+}
 
 module.exports = { register, login };

@@ -1,139 +1,171 @@
-# JWT Auth API — Node.js + Express + SQLite
+# JWT Auth API
 
-API RESTful com autenticação JWT, cadastro de usuários, login e rotas protegidas.
+A simple Node.js authentication API using JWT, SQLite (`sql.js`), bcrypt password hashing, and request validation with Zod.
 
----
+## Features
 
-## Estrutura do projeto
+- User registration and login with JWT authentication
+- Protected routes using a reusable auth middleware
+- Centralized error handling with structured HTTP responses
+- Global rate limiting and auth route rate limiting
+- Environment configuration using `.env`
+- Simple logger for startup and runtime events
+
+## Project structure
 
 ```
-api/
-├── src/
-│   ├── config/
-│   │   ├── database.js     # Conexão e schema SQLite
-│   │   └── env.js          # Variáveis de ambiente
-│   ├── controllers/
-│   │   ├── authController.js   # register / login
-│   │   └── userController.js   # rotas protegidas
-│   ├── middlewares/
-│   │   └── auth.js         # Verificação do JWT
-│   ├── routes/
-│   │   ├── auth.js         # /api/auth/*
-│   │   └── users.js        # /api/users/* (protegidas)
-│   ├── app.js              # Configuração do Express
-│   └── server.js           # Entry-point
-├── database.sqlite          # Criado automaticamente
-├── package.json
-└── README.md
+src/
+  config/
+    database.js       # initialize SQLite database and table
+    env.js            # environment variables and default values
+  controllers/
+    authController.js # register and login logic
+    userController.js # profile and users list logic
+  errors/
+    ApiError.js       # reusable API error class
+  middlewares/
+    auth.js           # JWT validation middleware
+    errorHandler.js   # centralized error handling
+    rateLimiter.js    # request rate limit middleware
+    validate.js       # Zod schema validation middleware
+  routes/
+    auth.js           # auth-related endpoints
+    users.js          # protected user endpoints
+  utils/
+    logger.js         # simple console logger
+  app.js              # Express app configuration
+  server.js           # application startup
+.gitignore             # recommended ignored files
+package.json           # dependencies and scripts
+README.md              # project documentation
+.env.example           # environment variables example
 ```
 
----
-
-## Instalação e uso
+## Installation
 
 ```bash
 npm install
-npm start          # produção
-npm run dev        # desenvolvimento (nodemon)
 ```
 
-Variáveis de ambiente opcionais:
+## Running
 
-| Variável        | Padrão                          | Descrição                     |
-|-----------------|---------------------------------|-------------------------------|
-| `PORT`          | `3000`                          | Porta do servidor             |
-| `JWT_SECRET`    | `troque-este-segredo-em-producao` | Chave secreta do JWT        |
-| `JWT_EXPIRES_IN`| `1h`                            | Expiração do token            |
+```bash
+npm start
+```
 
----
+Development mode:
 
-## Endpoints
+```bash
+npm run dev
+```
 
-### Público
+## Environment variables
 
-#### `GET /health`
-Verifica se a API está online.
+Copy `.env.example` to `.env` and edit values as needed.
+
+Supported variables:
+
+- `PORT` — server port (default: `3000`)
+- `JWT_SECRET` — JWT secret key (default: `troque-este-segredo-em-producao`)
+- `JWT_EXPIRES_IN` — JWT expiration time (default: `1h`)
+- `RATE_LIMIT_WINDOW_MS` — rate limit window in milliseconds (default: `900000`)
+- `RATE_LIMIT_MAX` — global request limit per window (default: `100`)
+- `AUTH_RATE_LIMIT_MAX` — auth route request limit per window (default: `20`)
+
+## API Endpoints
+
+### Health
+
+- `GET /health`
+
+Response:
 
 ```json
 { "status": "ok" }
 ```
 
----
+### Authentication
 
 #### `POST /api/auth/register`
-Cria um novo usuário e retorna o JWT.
 
-**Body:**
+Register a new user.
+
+Request body:
+
 ```json
 {
   "name": "Maria Silva",
-  "email": "maria@email.com",
-  "password": "senha123"
+  "email": "maria@example.com",
+  "password": "password123"
 }
 ```
 
-**Resposta 201:**
+Successful response:
+
 ```json
 {
-  "message": "Usuário criado com sucesso.",
-  "user": { "id": 1, "name": "Maria Silva", "email": "maria@email.com" },
+  "message": "User created successfully.",
+  "user": { "id": 1, "name": "Maria Silva", "email": "maria@example.com" },
   "token": "<jwt>"
 }
 ```
-
----
 
 #### `POST /api/auth/login`
-Autentica o usuário e retorna o JWT.
 
-**Body:**
+Login and receive a JWT.
+
+Request body:
+
 ```json
 {
-  "email": "maria@email.com",
-  "password": "senha123"
+  "email": "maria@example.com",
+  "password": "password123"
 }
 ```
 
-**Resposta 200:**
+Successful response:
+
 ```json
 {
-  "message": "Login realizado com sucesso.",
-  "user": { "id": 1, "name": "Maria Silva", "email": "maria@email.com" },
+  "message": "Login successful.",
+  "user": { "id": 1, "name": "Maria Silva", "email": "maria@example.com" },
   "token": "<jwt>"
 }
 ```
 
----
+### Protected routes
 
-### Protegidas 🔒
+All protected endpoints require the `Authorization` header:
 
-Todas exigem o header:
 ```
 Authorization: Bearer <token>
 ```
 
 #### `GET /api/users/me`
-Retorna os dados do usuário autenticado.
+
+Returns the current authenticated user profile.
 
 #### `GET /api/users`
-Lista todos os usuários cadastrados.
 
----
+Returns all registered users.
 
-## Exemplos com cURL
+## Example with cURL
 
 ```bash
-# Cadastro
 curl -X POST http://localhost:3000/api/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"name":"Maria","email":"maria@email.com","password":"senha123"}'
+  -d '{"name":"Maria","email":"maria@example.com","password":"password123"}'
 
-# Login
 TOKEN=$(curl -s -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"maria@email.com","password":"senha123"}' | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+  -d '{"email":"maria@example.com","password":"password123"}' | jq -r '.token')
 
-# Rota protegida
 curl http://localhost:3000/api/users/me \
   -H "Authorization: Bearer $TOKEN"
 ```
+
+## Notes
+
+- Keep `.env` out of version control for production.
+- Templates are available in `.env.example`.
+- Rate limiting protects resources from abusive clients.

@@ -1,36 +1,40 @@
 const { getDb } = require('../config/database');
+const ApiError = require('../errors/ApiError');
 
-async function getProfile(req, res) {
+async function getProfile(req, res, next) {
   try {
     const db = await getDb();
-    const result = db.exec('SELECT id, name, email, created_at FROM users WHERE id = ?', [req.user.id]);
+    const stmt = db.prepare('SELECT id, name, email, created_at FROM users WHERE id = ?');
+    stmt.bind([req.user.id]);
 
-    if (result.length === 0 || result[0].values.length === 0)
-      return res.status(404).json({ error: 'Usuário não encontrado.' });
+    if (!stmt.step()) {
+      stmt.free();
+      return next(ApiError.notFound('User not found.'));
+    }
 
-    const cols = result[0].columns;
-    const user = Object.fromEntries(cols.map((c, i) => [c, result[0].values[0][i]]));
+    const user = stmt.getAsObject();
+    stmt.free();
 
     return res.json({ user });
   } catch (err) {
-    console.error('[getProfile]', err);
-    return res.status(500).json({ error: 'Erro interno no servidor.' });
+    return next(ApiError.internal('Failed to fetch user profile.'));
   }
 }
 
-async function listUsers(req, res) {
+async function listUsers(req, res, next) {
   try {
     const db = await getDb();
-    const result = db.exec('SELECT id, name, email, created_at FROM users ORDER BY id DESC');
+    const stmt = db.prepare('SELECT id, name, email, created_at FROM users ORDER BY id DESC');
 
-    const users = result.length === 0 ? [] : result[0].values.map(row =>
-      Object.fromEntries(result[0].columns.map((c, i) => [c, row[i]]))
-    );
+    const users = [];
+    while (stmt.step()) {
+      users.push(stmt.getAsObject());
+    }
+    stmt.free();
 
     return res.json({ total: users.length, users });
   } catch (err) {
-    console.error('[listUsers]', err);
-    return res.status(500).json({ error: 'Erro interno no servidor.' });
+    return next(ApiError.internal('Failed to fetch users list.'));
   }
 }
 

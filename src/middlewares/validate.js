@@ -1,5 +1,6 @@
+const ApiError = require('../errors/ApiError');
 
-const validate = (schema) => (req, res, next) => {
+const validate = (schema) => (req, _res, next) => {
   const result = schema.safeParse(req.body);
 
   if (!result.success) {
@@ -8,10 +9,7 @@ const validate = (schema) => (req, res, next) => {
       message: e.message,
     }));
 
-    return res.status(400).json({
-      message: 'Dados inválidos.',
-      errors,
-    });
+    return next(ApiError.badRequest('Invalid request body.', { errors }));
   }
 
   req.body = result.data;
